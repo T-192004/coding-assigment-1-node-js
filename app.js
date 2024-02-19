@@ -27,17 +27,92 @@ const initializeDBandServer = async () => {
 
 initializeDBandServer()
 
+////////////--------------------CHECK REQUEST BODY-----------------
+
+const checkRequestBody = async (request, response, next) => {
+  const {id, todo, category, priority, status, dueDate} = request.body
+  const {todoId} = request.params
+
+  if (category !== undefined) {
+    categoryArray = ['WORK', 'HOME', 'LEARNING']
+    categoryIsInArray = categoryArray.includes(category)
+
+    if (categoryIsInArray === true) {
+      request.category = category
+    } else {
+      response.status(400)
+      response.send('Invalid Todo Category')
+      return
+    }
+  }
+
+  if (priority !== undefined) {
+    priorityArray = ['HIGH', 'MEDIUM', 'LOW']
+    priorityIsInArray = priorityArray.includes(priority)
+    if (priorityIsInArray === true) {
+      request.priority = priority
+    } else {
+      response.status(400)
+      response.send('Invalid Todo Priority')
+      return
+    }
+  }
+
+  if (status !== undefined) {
+    statusArray = ['TO DO', 'IN PROGRESS', 'DONE']
+    statusIsInArray = statusArray.includes(status)
+    if (statusIsInArray === true) {
+      request.status = status
+    } else {
+      response.status(400)
+      response.send('Invalid Todo Status')
+      return
+    }
+  }
+
+  if (dueDate !== undefined) {
+    try {
+      const myDate = new Date(dueDate)
+      const formatedDate = format(new Date(dueDate), 'yyyy-MM-dd')
+      console.log(formatedDate)
+      const result = toDate(new Date(formatedDate))
+      const isValidDate = isValid(result)
+      console.log(isValidDate)
+      console.log(isValidDate)
+      if (isValidDate === true) {
+        request.dueDate = formatedDate
+      } else {
+        response.status(400)
+        response.send('Invalid Due Date')
+        return
+      }
+    } catch (e) {
+      response.status(400)
+      response.send('Invalid Due Date')
+      return
+    }
+  }
+  request.todo = todo
+  request.id = id
+
+  request.todoId = todoId
+
+  next()
+}
+
 /////--------------CHECK REQUEST QUERIES-----------------------
 
 const checkRequestQueries = async (request, response, next) => {
   const {search_q, priority, status, category, dueDate} = request.query
+  console.log(request.query)
   const {todoId} = request.params
 
   if (priority !== undefined) {
     const priorityArray = ['HIGH', 'MEDIUM', 'LOW']
     const isPriorityValid = priorityArray.includes(priority)
     if (isPriorityValid) {
-      request.category = category
+      request.priority = priority
+      console.log(request.priority)
     } else {
       response.status(400)
       response.send('Invalid Todo Priority')
@@ -136,12 +211,158 @@ app.get('/todos/', checkRequestQueries, async (request, response) => {
     FROM
         todo
     WHERE
-        todo LIKE "%${search_q}%"
-        AND status LIKE "%${status}%"
-        AND priority LIKE "%${priority}%
+        todo LIKE '%${search_q}%'
+        AND status LIKE '%${status}%'
+        AND priority LIKE '%${priority}%'
         AND category LIKE "%${category}%";
     `
   const getTodoArrayResponse = await db.all(getTodoQuery)
   response.send(getTodoArrayResponse.map(eachTodo => getTodoDetails(eachTodo)))
 })
+
+//////////----------------------API 2----------------------
+
+app.get('/todos/:todoId/',checkRequestQueries,async (request, response) => {
+  const {todoId} = request.params
+  console.log(request.params)
+  const getTodoIdQuery = `
+  SELECT 
+    *
+  FROM
+    todo
+  WHERE
+    id = ${todoId};
+  `
+  const todoIdResponse = await db.get(getTodoIdQuery)
+  console.log(todoIdResponse)
+  response.send(getTodoDetails(todoIdResponse))
+})
+
+/////////////---------------API 3 ------------------------
+
+app.get('/agenda/', checkRequestBody, async (request, response)=>{
+  const {dueDate} = request.query;
+  console.log(dueDate);
+  const getDueDateTodoQuery = `
+  SELECT 
+    *
+  FROM
+    todo
+  WHERE
+    due_date = '${dueDate}';
+  `;
+  const todoResponseArray = await db.all(getDueDateTodoQuery);
+  if (todoResponseArray === undefined){
+    response.status(400)
+    response.send("Invalid Due Date");
+  }
+  else{
+    response.send(
+      todoResponseArray.map(
+        eachtodo => getTodoDetails(eachtodo)
+      )
+    );
+  }
+  
+})
+
+
+//////////--------------------------API 4 ----------------------
+
+app.post('/todos/', checkRequestBody, async (request, response) => {
+  const {todoId, todo, priority, status, category, dueDate} = request.body
+  console.log(request.body)
+  const postTodoQuery = `
+  INSERT INTO 
+    todo (id, todo, priority, status, category, due_date)
+  VALUES
+    (${todoId}, '${todo}', '${priority}', '${status}', '${category}', '${dueDate}');
+  `
+  await db.run(postTodoQuery)
+  response.send('Todo Successfully Added')
+})
+
+///////----------------API 5-----------------------
+
+app.put('/todos/:todoId/', checkRequestBody, async (request, response) => {
+  console.log(request.body)
+  const {todoId} = request.params
+  const {todo, priority, status, category, dueDate} = request.body
+  let responseStatus = null;
+  let updatedTodoQuery = null;
+  switch (true) {
+    case status !== undefined:
+      updatedTodoQuery = `
+      UPDATE 
+        todo
+      SET
+        status = '${status}'
+      WHERE
+        id = ${todoId};
+      `
+      responseStatus = 'Status Updated'
+      break
+    case priority !== undefined:
+      updatedTodoQuery = `
+      UPDATE 
+        todo
+      SET
+        priority = '${priority}'
+      WHERE
+        id = ${todoId};
+      `
+      responseStatus = 'Priority Updated'
+      break
+    case category !== undefined:
+      updatedTodoQuery = `
+      UPDATE 
+        todo
+      SET
+        category = '${category}'
+      WHERE
+        id = ${todoId};
+      `
+      responseStatus = 'Category Updated'
+      break
+    case (dueDate !== undefined):
+      updatedTodoQuery = `
+      UPDATE 
+        todo
+      SET
+        due_date = '${dueDate}'
+      WHERE 
+        id = ${todoId};
+      `
+      responseStatus = 'Due Date Updated';
+      break;
+    default:
+      updatedTodoQuery = `
+      UPDATE 
+        todo
+      SET
+        todo = '${todo}'
+      WHERE
+        id = ${todoId};
+      `
+      responseStatus = 'Todo Updated'
+      break
+  }
+  await db.run(updatedTodoQuery)
+  response.send(responseStatus)
+})
+
+//////----------------API 6----------------------------------
+
+app.delete('/todos/:todoId/', async (request, response) => {
+  const {todoId} = request.params
+  const deleteTodoQuery = `
+  DELETE FROM
+    todo
+  WHERE
+    id = ${todoId};
+  `
+  await db.run(deleteTodoQuery)
+  response.send('Todo Deleted')
+})
+
 module.exports = app
