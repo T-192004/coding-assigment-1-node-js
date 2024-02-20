@@ -2,6 +2,7 @@ const express = require('express')
 const {open} = require('sqlite')
 const sqlite3 = require('sqlite3')
 const date = require('date-fns')
+//const toDate = require('date-fns/todate')
 const isValid = require('date-fns/isValid')
 const format = require('date-fns/format')
 const path = require('path')
@@ -72,22 +73,21 @@ const checkRequestBody = async (request, response, next) => {
 
   if (dueDate !== undefined) {
     try {
-      const myDate = new Date(dueDate)
       const formatedDate = format(new Date(dueDate), 'yyyy-MM-dd')
       console.log(formatedDate)
-      const result = toDate(new Date(formatedDate))
-      const isValidDate = isValid(result)
-      console.log(isValidDate)
+      const isValidDate = isValid(formatedDate)
       console.log(isValidDate)
       if (isValidDate === true) {
         request.dueDate = formatedDate
       } else {
         response.status(400)
+        console.log('DATE IS GETTING NOT COOORRECT')
         response.send('Invalid Due Date')
         return
       }
     } catch (e) {
       response.status(400)
+      console.log(`error : ${e.message}`)
       response.send('Invalid Due Date')
       return
     }
@@ -144,6 +144,8 @@ const checkRequestQueries = async (request, response, next) => {
   if (dueDate !== undefined) {
     try {
       const myDate = new Date(dueDate)
+      console.log(dueDate)
+      console.log(myDate)
       const formatedDate = format(new Date(dueDate), 'yyyy-MM-dd')
       console.log(formatedDate, 'f')
       const result = toDate(
@@ -222,7 +224,7 @@ app.get('/todos/', checkRequestQueries, async (request, response) => {
 
 //////////----------------------API 2----------------------
 
-app.get('/todos/:todoId/',checkRequestQueries,async (request, response) => {
+app.get('/todos/:todoId/', checkRequestQueries, async (request, response) => {
   const {todoId} = request.params
   console.log(request.params)
   const getTodoIdQuery = `
@@ -240,9 +242,9 @@ app.get('/todos/:todoId/',checkRequestQueries,async (request, response) => {
 
 /////////////---------------API 3 ------------------------
 
-app.get('/agenda/', checkRequestBody, async (request, response)=>{
-  const {dueDate} = request.query;
-  console.log(dueDate);
+app.get('/agenda/', checkRequestBody, async (request, response) => {
+  const {dueDate} = request.query
+  console.log(dueDate)
   const getDueDateTodoQuery = `
   SELECT 
     *
@@ -250,22 +252,15 @@ app.get('/agenda/', checkRequestBody, async (request, response)=>{
     todo
   WHERE
     due_date = '${dueDate}';
-  `;
-  const todoResponseArray = await db.all(getDueDateTodoQuery);
-  if (todoResponseArray === undefined){
+  `
+  const todoResponseArray = await db.all(getDueDateTodoQuery)
+  if (todoResponseArray === undefined) {
     response.status(400)
-    response.send("Invalid Due Date");
+    response.send('Invalid Due Date')
+  } else {
+    response.send(todoResponseArray.map(eachtodo => getTodoDetails(eachtodo)))
   }
-  else{
-    response.send(
-      todoResponseArray.map(
-        eachtodo => getTodoDetails(eachtodo)
-      )
-    );
-  }
-  
 })
-
 
 //////////--------------------------API 4 ----------------------
 
@@ -288,8 +283,8 @@ app.put('/todos/:todoId/', checkRequestBody, async (request, response) => {
   console.log(request.body)
   const {todoId} = request.params
   const {todo, priority, status, category, dueDate} = request.body
-  let responseStatus = null;
-  let updatedTodoQuery = null;
+  let responseStatus = null
+  let updatedTodoQuery = null
   switch (true) {
     case status !== undefined:
       updatedTodoQuery = `
@@ -324,7 +319,7 @@ app.put('/todos/:todoId/', checkRequestBody, async (request, response) => {
       `
       responseStatus = 'Category Updated'
       break
-    case (dueDate !== undefined):
+    case dueDate !== undefined:
       updatedTodoQuery = `
       UPDATE 
         todo
@@ -333,8 +328,8 @@ app.put('/todos/:todoId/', checkRequestBody, async (request, response) => {
       WHERE 
         id = ${todoId};
       `
-      responseStatus = 'Due Date Updated';
-      break;
+      responseStatus = 'Due Date Updated'
+      break
     default:
       updatedTodoQuery = `
       UPDATE 
