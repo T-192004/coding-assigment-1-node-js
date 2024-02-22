@@ -279,7 +279,7 @@ app.post('/todos/',checkRequestBody, async (request, response) => {
 
 ///////----------------API 5-----------------------
 
-app.put('/todos/:todoId/', async (request, response) => {
+app.put('/todos/:todoId/',checkRequestBody, async (request, response) => {
   console.log(request.body)
   const {todoId} = request.params
   const {todo, priority, status, category, dueDate} = request.body
