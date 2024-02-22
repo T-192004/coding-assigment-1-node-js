@@ -180,18 +180,6 @@ const checkRequestQueries = async (request, response, next) => {
   next()
 }
 
-/////////////----------------TO DO DETAILS -------------------
-
-const getTodoDetails = dbObj => {
-  return {
-    id: dbObj.id,
-    todo: dbObj.todo,
-    priority: dbObj.priority,
-    status: dbObj.status,
-    category: dbObj.category,
-    dueDate: dbObj.dueDate,
-  }
-}
 
 //////////////----------------API 1----------------
 app.get('/todos/', checkRequestQueries, async (request, response) => {
@@ -219,17 +207,22 @@ app.get('/todos/', checkRequestQueries, async (request, response) => {
         AND category LIKE "%${category}%";
     `
   const getTodoArrayResponse = await db.all(getTodoQuery)
-  response.send(getTodoArrayResponse.map(eachTodo => getTodoDetails(eachTodo)))
+  response.send(getTodoArrayResponse)
 })
 
 //////////----------------------API 2----------------------
 
-app.get('/todos/:todoId/', checkRequestQueries, async (request, response) => {
+app.get('/todos/:todoId/', async (request, response) => {
   const {todoId} = request.params
   console.log(request.params)
   const getTodoIdQuery = `
   SELECT 
-    *
+    id,
+    todo,
+    priority,
+    status,
+    category,
+    due_date AS dueDate
   FROM
     todo
   WHERE
@@ -237,34 +230,40 @@ app.get('/todos/:todoId/', checkRequestQueries, async (request, response) => {
   `
   const todoIdResponse = await db.get(getTodoIdQuery)
   console.log(todoIdResponse)
-  response.send(getTodoDetails(todoIdResponse))
+  response.send(todoIdResponse)
 })
 
 /////////////---------------API 3 ------------------------
 
-app.get('/agenda/', checkRequestBody, async (request, response) => {
-  const {dueDate} = request.query
-  console.log(dueDate)
+app.get('/agenda/', async (request, response) => {
+  const {date} = request.query
+  console.log(date)
+  const formatDate = format(new Date(date), 'yyyy-MM-dd')
   const getDueDateTodoQuery = `
   SELECT 
-    *
+    id,
+    todo,
+    priority,
+    status,
+    category,
+    due_date AS dueDate
   FROM
     todo
   WHERE
-    due_date = '${dueDate}';
+    due_date = '${formatDate}';
   `
   const todoResponseArray = await db.all(getDueDateTodoQuery)
   if (todoResponseArray === undefined) {
     response.status(400)
     response.send('Invalid Due Date')
   } else {
-    response.send(todoResponseArray.map(eachtodo => getTodoDetails(eachtodo)))
+    response.send(todoResponseArray)
   }
 })
 
 //////////--------------------------API 4 ----------------------
 
-app.post('/todos/', checkRequestBody, async (request, response) => {
+app.post('/todos/',checkRequestBody, async (request, response) => {
   const {todoId, todo, priority, status, category, dueDate} = request.body
   console.log(request.body)
   const postTodoQuery = `
@@ -274,12 +273,13 @@ app.post('/todos/', checkRequestBody, async (request, response) => {
     (${todoId}, '${todo}', '${priority}', '${status}', '${category}', '${dueDate}');
   `
   await db.run(postTodoQuery)
+  console.log("added")
   response.send('Todo Successfully Added')
 })
 
 ///////----------------API 5-----------------------
 
-app.put('/todos/:todoId/', checkRequestBody, async (request, response) => {
+app.put('/todos/:todoId/', async (request, response) => {
   console.log(request.body)
   const {todoId} = request.params
   const {todo, priority, status, category, dueDate} = request.body
@@ -320,11 +320,12 @@ app.put('/todos/:todoId/', checkRequestBody, async (request, response) => {
       responseStatus = 'Category Updated'
       break
     case dueDate !== undefined:
+      const formatDate = format(new Date(dueDate), 'yyyy-MM-dd')
       updatedTodoQuery = `
       UPDATE 
         todo
       SET
-        due_date = '${dueDate}'
+        due_date = '${formatDate}'AS dueDate
       WHERE 
         id = ${todoId};
       `
